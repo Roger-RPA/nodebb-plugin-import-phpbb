@@ -1,30 +1,38 @@
-
 var async = require('async');
-var mysql = require('mysql');
 var _ = require('underscore');
 var noop = function(){};
-var logPrefix = '[nodebb-plugin-import-phpbb]';
+var logPrefix = '[nodebb-plugin-import-rpa]';
+
+var mongoose = require('mongoose'),
+    Schema = mongoose.Schema;
+
+var User = require('models/user');
+var Forum = require('models/forum');
 
 (function(Exporter) {
 
     Exporter.setup = function(config, callback) {
         Exporter.log('setup');
 
-        // mysql db only config
-        // extract them from the configs passed by the nodebb-plugin-import adapter
         var _config = {
             host: config.dbhost || config.host || 'localhost',
             user: config.dbuser || config.user || 'root',
             password: config.dbpass || config.pass || config.password || '',
             port: config.dbport || config.port || 3306,
-            database: config.dbname || config.name || config.database || 'phpbb'
+            database: config.dbname || config.name || config.database || 'rpa-community'
         };
 
         Exporter.config(_config);
         Exporter.config('prefix', config.prefix || config.tablePrefix || '' /* phpbb_ ? */ );
 
-        Exporter.connection = mysql.createConnection(_config);
-        Exporter.connection.connect();
+        //Connect to MongoDB
+        mongoose.connected( _config.host, function(err){
+          if(err){
+            var err = {error: 'No database connection'};
+            Exporter.error( err.error );
+            return callback(err);
+          }
+        });
 
         callback(null, Exporter.config());
     };
@@ -32,75 +40,94 @@ var logPrefix = '[nodebb-plugin-import-phpbb]';
     Exporter.getUsers = function(callback) {
         return Exporter.getPaginatedUsers(0, -1, callback);
     };
+
     Exporter.getPaginatedUsers = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
 
-        var err;
-        var prefix = Exporter.config('prefix');
-        var startms = +new Date();
-        var query = 'SELECT '
-            + prefix + 'users.user_id as _uid, '
-            + prefix + 'users.username as _username, '
-            + prefix + 'users.username_clean as _alternativeUsername, '
-            + prefix + 'users.user_email as _registrationEmail, '
-            //+ prefix + 'users.user_rank as _level, '
-            + prefix + 'users.user_regdate as _joindate, '
-            + prefix + 'users.user_email as _email '
-            //+ prefix + 'banlist.ban_id as _banned '
-            //+ prefix + 'USER_PROFILE.USER_SIGNATURE as _signature, '
-            //+ prefix + 'USER_PROFILE.USER_HOMEPAGE as _website, '
-            //+ prefix + 'USER_PROFILE.USER_OCCUPATION as _occupation, '
-            //+ prefix + 'USER_PROFILE.USER_LOCATION as _location, '
-            //+ prefix + 'USER_PROFILE.USER_AVATAR as _picture, '
-            //+ prefix + 'USER_PROFILE.USER_TITLE as _title, '
-            //+ prefix + 'USER_PROFILE.USER_RATING as _reputation, '
-            //+ prefix + 'USER_PROFILE.USER_TOTAL_RATES as _profileviews, '
-            //+ prefix + 'USER_PROFILE.USER_BIRTHDAY as _birthday '
+        var err, map;
 
-            + 'FROM ' + prefix + 'users '
-            + 'WHERE ' + prefix + 'users.user_id = ' + prefix + 'users.user_id '
-            + (start >= 0 && limit >= 0 ? 'LIMIT ' + start + ',' + limit : '');
-
-
-        if (!Exporter.connection) {
-            err = {error: 'MySQL connection is not setup. Run setup(config) first'};
+        if (!mongoose.connection) {
+            err = {error: 'Connection not setup!'};
             Exporter.error(err.error);
             return callback(err);
         }
 
-        Exporter.connection.query(query,
-            function(err, rows) {
-                if (err) {
-                    Exporter.error(err);
-                    return callback(err);
+        User.find( {}, function( err, user ) {
+            // Get location if any
+            location = "";
+            if ( user.organization ) {
+                if( user.organization.organization_name ) {
+                    location += user.organization.organization_name;
+                    if( user.organization.organization_locality ) {
+                        location += ", " + user.organization.organization_name;
+                    }
+                    if( user.organization.organization_country ) {
+                        location += ", " + user.organization.organization_country;
+                    }
+                } else if( user.organization.name ) {
+                    location += user.organization.name;
+                    if( user.organization.formatted_address ) {
+                        adr = String.split( user.organization.formatted_address, ", " );
+                        if ( adr.length === 4 && adr[3] === "USA" ) {
+                            location += ', ' + adr[1] + ', ' + String.split( adr[2], " " )[0] + ', ' + adr[3];
+                        } else {
+                            location += adr[ adr.length - 1 ];
+                        }
+                    }
                 }
+            }
 
-                //normalize here
-                var map = {};
-                rows.forEach(function(row) {
-                    // nbb forces signatures to be less than 150 chars
-                    // keeping it HTML see https://github.com/akhoury/nodebb-plugin-import#markdown-note
-                    row._signature = Exporter.truncateStr(row._signature || '', 150);
+            // Create the output
+            map[ user._id ] = {
+                "_uid": user._id, // REQUIRED
+                "_email": user.username, // REQUIRED
+                "_username": user.username, // REQUIRED
+                // "_joindate": 1386475817370, // OPTIONAL, [UNIT: MILLISECONDS], defaults to current, but what's the point of migrating if you don't preserve dates
+                "_alternativeUsername": user.first_name + " " + user.last_name, // OPTIONAL, defaults to '', some forums provide UserDisplayName, we could leverage that if the _username validation fails
+                // if you would like to generate random passwords, you will need to set the config.passwordGen.enabled = true, note that this will impact performance pretty hard
+                // the new passwords with the usernames, emails and some more stuff will be spit out in the logs
+                // look for the [user-csv] OR [user-json] tags to grep for a list of them
+                // save dem logs
+                // "_password": user.password, // OPTIONAL, if you have them, or you want to generate them on your own, great, if not, all passwords will be blank
+                // "_signature": "u45 signature", // OPTIONAL, defaults to '', over 150 chars will be truncated with an '...' at the end
+                // "_picture": "http://images.com/derp.png", // OPTIONAL, defaults to ''. Note that, if there is an '_piçture' on the 'normalized' object, the 'imported' objected will be augmented with a key imported.keptPicture = true, so you can iterate later and check if the images 200 or 404s
+                // "_pictureBlob": "...BINARY BLOB...", // OPTIONAL, defaults to null
+                // "_pictureFilename": "123.png", // OPTIONAL, only applicable if using _pictureBlob, defaults to ''
+                // "_path": "/myoldforum/user/123", // OPTIONAL, the old path to reach this user's page, defaults to ''
+                // "_slug": "old-user-slug", // OPTIONAL
+                // obviously this one depends on implementing the optional getPaginatedGroups function
+                // "_groups": [123, 456, 789], // OPTIONAL, an array of old group ids that this user belongs to,
+                // "_website": "u45.com", // OPTIONAL, defaults to ''
+                "_fullname": user.first_name + " " + user.last_name, // OPTIONAL, defaults to ''
+                // "_banned": 0, // OPTIONAL, defaults to 0
+                // read cids and tids by that user, it's more efficient to use _readCids if you know that a user has read all the topics in a category.
+                // "_readCids": [1, 2, 4, 5, 6, 7], // OPTIONAL, defaults to []
+                // untested with very large sets. So.
+                // "_readTids": [1, 2, 4, 5, 6, 7], // OPTIONAL, defaults to []
+                // following other _Uids, untested with very large sets. So.
+                // "_followingUids": [1, 2, 4, 5, 6, 7], // OPTIONAL, defaults to []
+                // friend other _Uids, untested with very large sets. So.
+                // if you have https://github.com/sanbornmedia/nodebb-plugin-friends installed or want to use it
+                // "_friendsUids": [1, 2, 4, 5, 6, 7], // OPTIONAL, defaults to []
+                "_location": location, // OPTIONAL, defaults to ''
+                // (there is a config for multiplying these with a number for moAr karma)
+                // Also, if you're implementing getPaginatedVotes, every vote will also impact the user's reputation
+                // "_reputation": 123, // OPTIONAL, defaults to 0,
+                // "_profileviews": 1, // OPTIONAL, defaults to 0
+                // "_birthday": "01/01/1977", // OPTIONAL, [FORMAT: mm/dd/yyyy], defaults to ''
+                "_showemail": 0 // OPTIONAL, defaults to 0
+                // "_lastposttime": 1386475817370, // OPTIONAL, [UNIT: MILLISECONDS], defaults to current
+                // "_level": "" // OPTIONAL, [OPTIONS: 'administrator' or 'moderator'], defaults to '', also note that a moderator will become a NodeBB Moderator on ALL categories at the moment.
+                // "_lastonline": 1386475827370 // OPTIONAL, [UNIT: MILLISECONDS], defaults to undefined
+            };
 
-                    // from unix timestamp (s) to JS timestamp (ms)
-                    row._joindate = ((row._joindate || 0) * 1000) || startms;
-
-                    // lower case the email for consistency
-                    row._email = (row._email || '').toLowerCase();
-
-                    // I don't know about you about I noticed a lot my users have incomplete urls, urls like: http://
-                    row._picture = Exporter.validateUrl(row._picture);
-                    row._website = Exporter.validateUrl(row._website);
-
-                    map[row._uid] = row;
-                });
-
-                callback(null, map);
-            });
+        } ).skip( req.page * perPage).limit( perPage ).then( function () {
+            callback(null, map);
+        });
     };
 
     Exporter.getCategories = function(callback) {
-        return Exporter.getPaginatedCategories(0, -1, callback);    
+        return Exporter.getPaginatedCategories(0, -1, callback);
     };
     Exporter.getPaginatedCategories = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
@@ -114,7 +141,7 @@ var logPrefix = '[nodebb-plugin-import-phpbb]';
             + prefix + 'forums.forum_desc as _description '
             + 'FROM ' + prefix + 'forums '
             +  (start >= 0 && limit >= 0 ? 'LIMIT ' + start + ',' + limit : '');
-            
+
         if (!Exporter.connection) {
             err = {error: 'MySQL connection is not setup. Run setup(config) first'};
             Exporter.error(err.error);
