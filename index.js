@@ -182,34 +182,6 @@ var Forum = require('models/forum');
 
                 "_timestamp": forum.date.getTime() // OPTIONAL, [UNIT: Milliseconds], defaults to current, but what's the point of migrating if you dont preserve dates
 
-                // "_viewcount": 10, // OPTIONAL, defaults to 0
-
-                // "_locked": 0, // OPTIONAL, defaults to 0, during migration, ALL topics will be unlocked then locked back up at the end
-
-                // "_tags": ["tag1", "tag2", "tag3"], // OPTIONAL, an array of tags, or a comma separated string would work too, defaults to null
-
-                // "_attachments": ["http://example.com/myfile.zip"], // OPTIONAL, an array of urls, to append to the content for download.
-                // OR you can pass a filename with it
-                // "_attachments": [{url: "http://example.com/myfile.zip", filename: "www.zip"}], // OPTIONAL, an array of objects with urls and filenames, to append to the content for download.
-
-                // OPTIONAL, an array of objects, each object mush have the binary BLOB,
-                // either a filename or extension, then each file will be written to disk,
-                // if no filename is provided, the extension will be used and a filename will be generated as attachment_t_{_tid}_{index}{extension}
-                // and its url would be appended to the _content for download
-                // "_attachmentsBlobs": [ {blob: <BINARY>, filename: "myfile.zip"}, {blob: <BINARY>, extension: ".zip"} ],
-
-
-                // "_deleted": 0, // OPTIONAL, defaults to 0
-
-                // "_pinned": 1 // OPTIONAL, defaults to 0
-
-                // "_edited": 1386475817370 // OPTIONAL, [UNIT: Milliseconds] see post._edited defaults to null
-
-                // "_reputation": 1234, // OPTIONAL, defaults to 0, must be >= 0, not to be confused with _votes (see getPaginatedVotes for votes)
-
-                // "_path": "/myoldforum/topic/123", // OPTIONAL, the old path to reach this topic's page, defaults to ''
-
-                // "_slug": "old-topic-slug" // OPTIONAL, defaults to ''
             };
         } ).skip( start ).limit( limit ).then( function () {
             callback(null, map);
@@ -256,27 +228,7 @@ var Forum = require('models/forum');
                     // "_uemail": "u45@example.com", // OPTIONAL, The OLD USER EMAIL. If the user is not imported, the plugin will get the user by his _uemail
 
                     // "_toPid": 65485, // OPTIONAL, OLD REPLIED-TO POST ID,
-                    "_timestamp": comment.date.getTime() // OPTIONAL, [UNIT: Milliseconds], defaults to current, but what's the point of migrating if you dont preserve dates.
-
-                    // "_guest": "Some dude" // OPTIONAL, if you don't have _uid, you can pass a guest name to be used in future features, defaults to null
-
-                    // "_ip": "123.456.789.012", // OPTIONAL, not currently used in NodeBB core, but it might be in the future, defaults to null
-
-                    // "_edited": 1386475829970, // OPTIONAL, [UNIT: Milliseconds], if and when the post was edited, defaults to null
-
-                    // "_reputation": 0, // OPTIONAL, defaults to 0, must be >= 0, not to be confused with _votes (see getPaginatedVotes for votes)
-
-                    // "_attachments": ["http://example.com/myfile.zip"], // OPTIONAL, an array of urls, to append to the content for download.
-
-                    // OPTIONAL, an array of objects, each object mush have the binary BLOB,
-                    // either a filename or extension, then each file will be written to disk,
-                    // if no filename is provided, the extension will be used and a filename will be generated as attachment_p_{_pid}_{index}{extension}
-                    // and its url would be appended to the _content for download
-                    // "_attachmentsBlobs": [ {blob: <BINARY>, filename: "myfile.zip"}, {blob: <BINARY>, extension: ".zip"} ],
-
-                    // "_path": "/myoldforum/topic/123#post56789", // OPTIONAL, the old path to reach this post's page and maybe deep link, defaults to ''
-
-                    // "_slug": "old-post-slug" // OPTIONAL, defaults to ''
+                    "_timestamp": comment.date.getTime() // OPTIONAL, [UNIT: Milliseconds], defaults to current, but what's the point of migrating if you dont preserve dates
 
             }
                 id ++;
