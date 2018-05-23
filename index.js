@@ -44,7 +44,7 @@ var Forum = require('models/forum');
     Exporter.getPaginatedUsers = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
 
-        var err, map;
+        var err, map = {};
 
         if (!mongoose.connection) {
             err = {error: 'Connection not setup!'};
@@ -121,7 +121,7 @@ var Forum = require('models/forum');
                 // "_lastonline": 1386475827370 // OPTIONAL, [UNIT: MILLISECONDS], defaults to undefined
             };
 
-        } ).skip( req.page * perPage).limit( perPage ).then( function () {
+        } ).skip( start ).limit( limit ).then( function () {
             callback(null, map);
         });
     };
@@ -132,41 +132,18 @@ var Forum = require('models/forum');
     Exporter.getPaginatedCategories = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
 
-        var err;
-        var prefix = Exporter.config('prefix');
-        var startms = +new Date();
-        var query = 'SELECT '
-            + prefix + 'forums.forum_id as _cid, '
-            + prefix + 'forums.forum_name as _name, '
-            + prefix + 'forums.forum_desc as _description '
-            + 'FROM ' + prefix + 'forums '
-            +  (start >= 0 && limit >= 0 ? 'LIMIT ' + start + ',' + limit : '');
+        var err, map;
 
-        if (!Exporter.connection) {
-            err = {error: 'MySQL connection is not setup. Run setup(config) first'};
-            Exporter.error(err.error);
-            return callback(err);
-        }
+        map = {
+            "12345678abcdefgh": {
+                "_cid": "12345678abcdefgh", // REQUIRED
+                "_name": "General Discussion 2", // REQUIRED
+                "_description": "A place to talk about whatever you want" // OPTIONAL
+            }
+        };
 
-        Exporter.connection.query(query,
-            function(err, rows) {
-                if (err) {
-                    Exporter.error(err);
-                    return callback(err);
-                }
+        callback( null, map );
 
-                //normalize here
-                var map = {};
-                rows.forEach(function(row) {
-                    row._name = row._name || 'Untitled Category';
-                    row._description = row._description || 'No decsciption available';
-                    row._timestamp = ((row._timestamp || 0) * 1000) || startms;
-
-                    map[row._cid] = row;
-                });
-
-                callback(null, map);
-            });
     };
 
     Exporter.getTopics = function(callback) {
@@ -175,67 +152,68 @@ var Forum = require('models/forum');
     Exporter.getPaginatedTopics = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
 
-        var err;
-        var prefix = Exporter.config('prefix');
-        var startms = +new Date();
-        var query =
-            'SELECT '
-            + prefix + 'topics.topic_id as _tid, '
-            + prefix + 'topics.forum_id as _cid, '
+        var err, map = {};
 
-            // this is the 'parent-post'
-            // see https://github.com/akhoury/nodebb-plugin-import#important-note-on-topics-and-posts
-            // I don't really need it since I just do a simple join and get its content, but I will include for the reference
-            // remember this post EXCLUDED in the exportPosts() function
-            + prefix + 'topics.topic_first_post_id as _pid, '
-
-            + prefix + 'topics.topic_views as _viewcount, '
-            + prefix + 'topics.topic_title as _title, '
-            + prefix + 'topics.topic_time as _timestamp, '
-
-            // maybe use that to skip
-            + prefix + 'topics.topic_approved as _approved, '
-
-            + prefix + 'topics.topic_status as _status, '
-
-            //+ prefix + 'TOPICS.TOPIC_IS_STICKY as _pinned, '
-            + prefix + 'posts.poster_id as _uid, '
-            // this should be == to the _tid on top of this query
-            + prefix + 'posts.topic_id as _post_tid, '
-
-            // and there is the content I need !!
-            + prefix + 'posts.post_text as _content '
-
-            + 'FROM ' + prefix + 'topics, ' + prefix + 'posts '
-            // see
-            + 'WHERE ' + prefix + 'topics.topic_first_post_id=' + prefix + 'posts.post_id '
-            + (start >= 0 && limit >= 0 ? 'LIMIT ' + start + ',' + limit : '');
-
-
-        if (!Exporter.connection) {
-            err = {error: 'MySQL connection is not setup. Run setup(config) first'};
+        if (!mongoose.connection) {
+            err = {error: 'Connection not setup!'};
             Exporter.error(err.error);
             return callback(err);
         }
 
-        Exporter.connection.query(query,
-            function(err, rows) {
-                if (err) {
-                    Exporter.error(err);
-                    return callback(err);
-                }
+        Forum.find( {}, function( err, forum ) {
+            map[ forum._id ] = {
+                "_tid": forum._id, // REQUIRED, THE OLD TOPIC ID
 
-                //normalize here
-                var map = {};
-                rows.forEach(function(row) {
-                    row._title = row._title ? row._title[0].toUpperCase() + row._title.substr(1) : 'Untitled';
-                    row._timestamp = ((row._timestamp || 0) * 1000) || startms;
+                "_uid": forum.author, // OPTIONAL, THE OLD USER ID, Nodebb will create the topics for user 'Guest' if not provided
 
-                    map[row._tid] = row;
-                });
+                //"_uemail": "u45@example.com", // OPTIONAL, The OLD USER EMAIL. If the user is not imported, the plugin will get the user by his _uemail
 
-                callback(null, map);
-            });
+                //"_guest": "Some dude" // OPTIONAL, if you dont have _uid, you can pass a guest name to be used in future features, defaults to null
+
+                "_cid": "12345678abcdefghx", // REQUIRED, THE OLD CATEGORY ID
+
+                // "_ip": "123.456.789.012", // OPTIONAL, not currently used in NodeBB core, but it might be in the future, defaults to null
+
+                "_title": forum.title, // OPTIONAL, defaults to "Untitled :id"
+
+                "_content": forum.comments[0].comment, // REQUIRED
+
+                // "_thumb": "http://foo.bar/picture.png", // OPTIONAL, a thumbnail for the topic if you have one, note that the importer will NOT validate the URL
+
+                "_timestamp": forum.date.getTime() // OPTIONAL, [UNIT: Milliseconds], defaults to current, but what's the point of migrating if you dont preserve dates
+
+                // "_viewcount": 10, // OPTIONAL, defaults to 0
+
+                // "_locked": 0, // OPTIONAL, defaults to 0, during migration, ALL topics will be unlocked then locked back up at the end
+
+                // "_tags": ["tag1", "tag2", "tag3"], // OPTIONAL, an array of tags, or a comma separated string would work too, defaults to null
+
+                // "_attachments": ["http://example.com/myfile.zip"], // OPTIONAL, an array of urls, to append to the content for download.
+                // OR you can pass a filename with it
+                // "_attachments": [{url: "http://example.com/myfile.zip", filename: "www.zip"}], // OPTIONAL, an array of objects with urls and filenames, to append to the content for download.
+
+                // OPTIONAL, an array of objects, each object mush have the binary BLOB,
+                // either a filename or extension, then each file will be written to disk,
+                // if no filename is provided, the extension will be used and a filename will be generated as attachment_t_{_tid}_{index}{extension}
+                // and its url would be appended to the _content for download
+                // "_attachmentsBlobs": [ {blob: <BINARY>, filename: "myfile.zip"}, {blob: <BINARY>, extension: ".zip"} ],
+
+
+                // "_deleted": 0, // OPTIONAL, defaults to 0
+
+                // "_pinned": 1 // OPTIONAL, defaults to 0
+
+                // "_edited": 1386475817370 // OPTIONAL, [UNIT: Milliseconds] see post._edited defaults to null
+
+                // "_reputation": 1234, // OPTIONAL, defaults to 0, must be >= 0, not to be confused with _votes (see getPaginatedVotes for votes)
+
+                // "_path": "/myoldforum/topic/123", // OPTIONAL, the old path to reach this topic's page, defaults to ''
+
+                // "_slug": "old-topic-slug" // OPTIONAL, defaults to ''
+            };
+        } ).skip( start ).limit( limit ).then( function () {
+            callback(null, map);
+        });
     };
 
 	var getTopicsMainPids = function(callback) {
@@ -259,63 +237,59 @@ var Forum = require('models/forum');
     Exporter.getPaginatedPosts = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
 
-        var err;
-        var prefix = Exporter.config('prefix');
-        var startms = +new Date();
-        var query =
-            'SELECT ' + prefix + 'posts.post_id as _pid, '
-            //+ 'POST_PARENT_ID as _post_replying_to, ' phpbb doesn't have "reply to another post"
-            + prefix + 'posts.topic_id as _tid, '
-            + prefix + 'posts.post_time as _timestamp, '
-            // not being used
-            + prefix + 'posts.post_subject as _subject, '
+        var err, map = {}, id = 0, comment;
 
-            + prefix + 'posts.post_text as _content, '
-            + prefix + 'posts.poster_id as _uid, '
-
-            // maybe use this one to skip
-            + prefix + 'posts.post_approved as _approved '
-
-            + 'FROM ' + prefix + 'posts '
-
-		    // the ones that are topics main posts are filtered below
-            + 'WHERE ' + prefix + 'posts.topic_id > 0 '
-            + (start >= 0 && limit >= 0 ? 'LIMIT ' + start + ',' + limit : '');
-
-        if (!Exporter.connection) {
-            err = {error: 'MySQL connection is not setup. Run setup(config) first'};
+        if (!mongoose.connection) {
+            err = {error: 'Connection not setup!'};
             Exporter.error(err.error);
             return callback(err);
         }
 
-		Exporter.connection.query(query,
-			function (err, rows) {
-				if (err) {
-					Exporter.error(err);
-					return callback(err);
-				}
-				getTopicsMainPids(function(err, mpids) {
-					//normalize here
-					var map = {};
-					rows.forEach(function (row) {
-						// make it's not a topic
-						if (! mpids[row._pid]) {
-							row._content = row._content || '';
-							row._timestamp = ((row._timestamp || 0) * 1000) || startms;
-							map[row._pid] = row;
-						}
-					});
+        Forum.find( {}, function( err, forum ) {
+            for( var i=1; i < forum.comments.length; i ++ ) {
+                comment = forum[i];
+                map[ id ] = {
+                    "_pid": id, // REQUIRED, OLD POST ID
+                    "_tid": forum._id, // REQUIRED, OLD TOPIC ID
+                    "_content": comment.comment, // REQUIRED
+                    "_uid": comment.user, // OPTIONAL, OLD USER ID, if not provided NodeBB will create under the "Guest" username, unless _guest is passed.
+                    // "_uemail": "u45@example.com", // OPTIONAL, The OLD USER EMAIL. If the user is not imported, the plugin will get the user by his _uemail
 
-					callback(null, map);
-				});
-			});
+                    // "_toPid": 65485, // OPTIONAL, OLD REPLIED-TO POST ID,
+                    "_timestamp": comment.date.getTime() // OPTIONAL, [UNIT: Milliseconds], defaults to current, but what's the point of migrating if you dont preserve dates.
 
+                    // "_guest": "Some dude" // OPTIONAL, if you don't have _uid, you can pass a guest name to be used in future features, defaults to null
+
+                    // "_ip": "123.456.789.012", // OPTIONAL, not currently used in NodeBB core, but it might be in the future, defaults to null
+
+                    // "_edited": 1386475829970, // OPTIONAL, [UNIT: Milliseconds], if and when the post was edited, defaults to null
+
+                    // "_reputation": 0, // OPTIONAL, defaults to 0, must be >= 0, not to be confused with _votes (see getPaginatedVotes for votes)
+
+                    // "_attachments": ["http://example.com/myfile.zip"], // OPTIONAL, an array of urls, to append to the content for download.
+
+                    // OPTIONAL, an array of objects, each object mush have the binary BLOB,
+                    // either a filename or extension, then each file will be written to disk,
+                    // if no filename is provided, the extension will be used and a filename will be generated as attachment_p_{_pid}_{index}{extension}
+                    // and its url would be appended to the _content for download
+                    // "_attachmentsBlobs": [ {blob: <BINARY>, filename: "myfile.zip"}, {blob: <BINARY>, extension: ".zip"} ],
+
+                    // "_path": "/myoldforum/topic/123#post56789", // OPTIONAL, the old path to reach this post's page and maybe deep link, defaults to ''
+
+                    // "_slug": "old-post-slug" // OPTIONAL, defaults to ''
+
+            }
+                id ++;
+            }
+
+        } ).skip( start ).limit( limit ).then( function () {
+            callback(null, map);
+        });
     };
 
     Exporter.teardown = function(callback) {
-        Exporter.log('teardown');
-        Exporter.connection.end();
-
+        Exporter.log('Teardown!');
+        mongoose.disconnect();
         Exporter.log('Done');
         callback();
     };
