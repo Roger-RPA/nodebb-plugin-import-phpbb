@@ -26,7 +26,7 @@ var Forum = require('models/forum');
         Exporter.config('prefix', config.prefix || config.tablePrefix || '' /* phpbb_ ? */ );
 
         //Connect to MongoDB
-        mongoose.connected( _config.host, function(err){
+        mongoose.connect( _config.host, function(err){
           if(err){
             var err = {error: 'No database connection'};
             Exporter.error( err.error );
