@@ -47,7 +47,7 @@ var Forum;
     };
 
     Exporter.getUsers = function(callback) {
-        return Exporter.getPaginatedUsers(0, -1, callback);
+        return Exporter.getPaginatedUsers(0, null, callback);
     };
 
     Exporter.getPaginatedUsers = function(start, limit, callback) {
@@ -63,6 +63,7 @@ var Forum;
 
         User.find( {}, function( err, users ) {
             async.each( users, function( user, callback ) {
+
                 // Get location if any
                 location = "";
                 if ( user.organization ) {
@@ -77,9 +78,9 @@ var Forum;
                     } else if( user.organization.name ) {
                         location += user.organization.name;
                         if( user.organization.formatted_address ) {
-                            adr = String.split( user.organization.formatted_address, ", " );
+                            adr = user.organization.formatted_address.split( ", " );
                             if ( adr.length === 4 && adr[3] === "USA" ) {
-                                location += ', ' + adr[1] + ', ' + String.split( adr[2], " " )[0] + ', ' + adr[3];
+                                location += ', ' + adr[1] + ', ' + adr[2].split( " " )[0] + ', ' + adr[3];
                             } else {
                                 location += adr[ adr.length - 1 ];
                             }
@@ -99,7 +100,7 @@ var Forum;
                 };
                 callback();
             }, function() {
-                console.log( map );
+                //console.log( map );
                 callback(null, map);
             } );
 
@@ -107,7 +108,7 @@ var Forum;
     };
 
     Exporter.getCategories = function(callback) {
-        return Exporter.getPaginatedCategories(0, -1, callback);
+        return Exporter.getPaginatedCategories(0, null, callback);
     };
     Exporter.getPaginatedCategories = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
@@ -127,7 +128,7 @@ var Forum;
     };
 
     Exporter.getTopics = function(callback) {
-        return Exporter.getPaginatedTopics(0, -1, callback);
+        return Exporter.getPaginatedTopics(0, null, callback);
     };
     Exporter.getPaginatedTopics = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
@@ -142,27 +143,28 @@ var Forum;
 
         Forum.find( {}, function( err, forums ) {
             async.each( forums, function( forum, callback ) {
+                var comment = forum.comments.length > 0 ? forum.comments[0].comment : "";
                 map[ forum._id ] = {
                     "_tid": forum._id, // REQUIRED, THE OLD TOPIC ID
                     "_uid": forum.author, // OPTIONAL, THE OLD USER ID, Nodebb will create the topics for user 'Guest' if not provided
-                    "_cid": "12345678abcdefghx", // REQUIRED, THE OLD CATEGORY ID
+                    "_cid": "12345678abcdefgh", // REQUIRED, THE OLD CATEGORY ID
                     "_title": forum.title, // OPTIONAL, defaults to "Untitled :id"
-                    "_content": forum.comments[0].comment, // REQUIRED
+                    "_content": comment, // REQUIRED
                     "_timestamp": forum.date.getTime() // OPTIONAL, [UNIT: Milliseconds], defaults to current, but what's the point of migrating if you dont preserve dates
                 };
                 callback();
+            }, function () {
+                callback(null, map);
             } );
 
-        } ).skip( start ).limit( limit ).then( function () {
-            callback(null, map);
-        });
+        } ).skip( start ).limit( limit );
     };
 
 	var getTopicsMainPids = function(callback) {
 		if (Exporter._topicsMainPids) {
 			return callback(null, Exporter._topicsMainPids);
 		}
-		Exporter.getPaginatedTopics(0, -1, function(err, topicsMap) {
+		Exporter.getPaginatedTopics(0, null, function(err, topicsMap) {
 			if (err) return callback(err);
 
 			Exporter._topicsMainPids = {};
@@ -174,14 +176,14 @@ var Forum;
 		});
 	};
     Exporter.getPosts = function(callback) {
-        return Exporter.getPaginatedPosts(0, -1, callback);
+        return Exporter.getPaginatedPosts(0, null, callback);
     };
     Exporter.getPaginatedPosts = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
 
         var err, map = {}, id = 0, comment;
 
-        if (!Exporter.connection) {
+        if ( !Exporter.connection ) {
             err = {error: 'Connection not setup!'};
             Exporter.error(err.error);
             return callback(err);
