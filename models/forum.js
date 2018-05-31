@@ -29,5 +29,4 @@ ForumSchema.statics.removeSubscriber = function(id, user, callback) {
     this.update({_id: id}, {$pull:{subscribers: user}}, callback);
 };
 
-var Forum = mongoose.model('forum', ForumSchema, 'forum');
-module.exports = Forum;
+module.exports = ForumSchema;
