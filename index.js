@@ -19,8 +19,8 @@ var Forum;
 
         var _config = {
             host: ( config.dbhost || config.host || 'localhost' ),
-            user: config.dbuser || config.user || '',
-            pass: config.dbpass || config.pass || config.password || '',
+            user: "",
+            pass: "",
             port: config.dbport || config.port || 27017,
             dbName: config.dbname || config.name || config.database || 'RPA'
         };
@@ -60,7 +60,6 @@ var Forum;
             Exporter.error(err.error);
             return callback(err);
         }
-
         User.find( {}, function( err, users ) {
             async.each( users, function( user, callback ) {
 
@@ -110,21 +109,24 @@ var Forum;
     Exporter.getCategories = function(callback) {
         return Exporter.getPaginatedCategories(0, null, callback);
     };
+
+    var cid;
+
     Exporter.getPaginatedCategories = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
 
         var err, map;
 
-        map = {
-            "12345678abcdefgh": {
-                "_cid": "12345678abcdefgh", // REQUIRED
-                "_name": "General Discussion 2", // REQUIRED
-                "_description": "A place to talk about whatever you want" // OPTIONAL
-            }
+        cid = new mongoose.Types.ObjectId;
+
+        map = {};
+        map[ cid ] = {
+            "_cid": cid, // REQUIRED
+            "_name": "General Discussion 2", // REQUIRED
+            "_description": "A place to talk about whatever you want" // OPTIONAL
         };
 
         callback( null, map );
-
     };
 
     Exporter.getTopics = function(callback) {
@@ -140,14 +142,13 @@ var Forum;
             Exporter.error(err.error);
             return callback(err);
         }
-
         Forum.find( {}, function( err, forums ) {
             async.each( forums, function( forum, callback ) {
                 var comment = forum.comments.length > 0 ? forum.comments[0].comment : "";
                 map[ forum._id ] = {
                     "_tid": forum._id, // REQUIRED, THE OLD TOPIC ID
                     "_uid": forum.author, // OPTIONAL, THE OLD USER ID, Nodebb will create the topics for user 'Guest' if not provided
-                    "_cid": "12345678abcdefgh", // REQUIRED, THE OLD CATEGORY ID
+                    "_cid": cid, // REQUIRED, THE OLD CATEGORY ID
                     "_title": forum.title, // OPTIONAL, defaults to "Untitled :id"
                     "_content": comment, // REQUIRED
                     "_timestamp": forum.date.getTime() // OPTIONAL, [UNIT: Milliseconds], defaults to current, but what's the point of migrating if you dont preserve dates
@@ -156,7 +157,6 @@ var Forum;
             }, function () {
                 callback(null, map);
             } );
-
         } ).skip( start ).limit( limit );
     };
 
@@ -191,7 +191,7 @@ var Forum;
 
         Forum.find( {}, function( err, forums ) {
             async.each( forums, function( forum, callback ) {
-                for( var i=1; i < forum.comments.length; i ++ ) {
+                for( var i = 1; i < forum.comments.length; i ++ ) {
                     comment = forum.comments[i];
                     map[ id ] = {
                         "_pid": id, // REQUIRED, OLD POST ID
@@ -203,11 +203,10 @@ var Forum;
                     id ++;
                 }
                 callback();
+            }, function () {
+                callback(null, map);
             } );
-
-        } ).skip( start ).limit( limit ).then( function () {
-            callback(null, map);
-        });
+        } ).skip( start ).limit( limit );
     };
 
     Exporter.teardown = function(callback) {
@@ -261,6 +260,19 @@ var Forum;
                 Exporter.teardown(next);
             }
         ], callback);
+    };
+
+	Exporter.getMessages = function(callback) {
+		return Exporter.getPaginatedMessages(0, -1, callback);
+	};
+	Exporter.getPaginatedMessages = function(start, limit, callback) {
+	    callback( null, {} );
+    };
+	Exporter.getGroups = function(callback) {
+		return Exporter.getPaginatedGroups(0, -1, callback);
+	};
+	Exporter.getPaginatedGroups = function(start, limit, callback) {
+	    callback( null, {} );
     };
 
     Exporter.warn = function() {
@@ -317,8 +329,8 @@ var Forum;
     };
 
 
-    // TESTING
-    var testConfig = {};
+//    TESTING
+    var testConfig = { testing: true };
 
     Exporter.testrun( testConfig, function ( err ) {
         if ( err )
