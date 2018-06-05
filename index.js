@@ -15,29 +15,30 @@ var Forum;
 (function(Exporter) {
 
     Exporter.setup = function(config, callback) {
-        Exporter.log('setup');
+        Exporter.warn('setup');
 
         var _config = {
             host: ( config.dbhost || config.host || 'localhost' ),
             user: "",
             pass: "",
             port: config.dbport || config.port || 27017,
-            dbName: config.dbname || config.name || config.database || 'RPA'
+            dbName: config.dbname || config.name || config.database || 'RPA',
+            bufferCommands: false
         };
 
         Exporter.config( _config );
 
         //Connect to MongoDB
-        Exporter.connection = mongoose.createConnection(
-            "mongodb://" + _config.host + ":" + _config.port,
-            _config,
+        Exporter.warn('connecting...');
+        mongoose.connect( "mongodb://" + _config.host + ":" + _config.port, _config,
             function( err ) {
                 if( err ) {
                     err.error = 'No database connection';
                     Exporter.error( err.error );
                     return callback( err );
                 } else {
-                    console.log( "Creating models..." );
+                    Exporter.connection = mongoose.connection;
+                    Exporter.warn( "Creating models..." );
                     User = Exporter.connection.model('User', UserSchema, 'User');
                     Forum = Exporter.connection.model('Forum', ForumSchema, 'forum');
                     callback( null, Exporter.config() );
@@ -99,7 +100,7 @@ var Forum;
                 };
                 callback();
             }, function() {
-                //console.log( map );
+                Exporter.warn( map );
                 callback(null, map);
             } );
 
@@ -125,7 +126,7 @@ var Forum;
             "_name": "General Discussion 2", // REQUIRED
             "_description": "A place to talk about whatever you want" // OPTIONAL
         };
-
+        Exporter.warn( map );
         callback( null, map );
     };
 
@@ -155,26 +156,12 @@ var Forum;
                 };
                 callback();
             }, function () {
+                Exporter.warn( map );
                 callback(null, map);
             } );
         } ).skip( start ).limit( limit );
     };
 
-	var getTopicsMainPids = function(callback) {
-		if (Exporter._topicsMainPids) {
-			return callback(null, Exporter._topicsMainPids);
-		}
-		Exporter.getPaginatedTopics(0, null, function(err, topicsMap) {
-			if (err) return callback(err);
-
-			Exporter._topicsMainPids = {};
-			Object.keys(topicsMap).forEach(function(_tid) {
-				var topic = topicsMap[_tid];
-				Exporter._topicsMainPids[topic.topic_first_post_id] = topic._tid;
-			});
-			callback(null, Exporter._topicsMainPids);
-		});
-	};
     Exporter.getPosts = function(callback) {
         return Exporter.getPaginatedPosts(0, null, callback);
     };
@@ -204,6 +191,7 @@ var Forum;
                 }
                 callback();
             }, function () {
+                Exporter.warn( map );
                 callback(null, map);
             } );
         } ).skip( start ).limit( limit );
@@ -334,9 +322,9 @@ var Forum;
 
     Exporter.testrun( testConfig, function ( err ) {
         if ( err )
-            console.log( err.error );
+            Exporter.warn( err.error );
         else
-            console.log( "Completed with no reported errors." );
+            Exporter.warn( "Completed with no reported errors." );
     } );
 
 
