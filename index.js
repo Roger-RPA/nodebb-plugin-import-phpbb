@@ -15,7 +15,7 @@ var Forum;
 (function(Exporter) {
 
     Exporter.setup = function(config, callback) {
-        Exporter.warn('setup');
+        Exporter.log('setup');
 
         var _config = {
             host: ( config.dbhost || config.host || 'localhost' ),
@@ -29,7 +29,7 @@ var Forum;
         Exporter.config( _config );
 
         //Connect to MongoDB
-        Exporter.warn('connecting...');
+        Exporter.log('connecting...');
         mongoose.connect( "mongodb://" + _config.host + ":" + _config.port, _config,
             function( err ) {
                 if( err ) {
@@ -38,7 +38,7 @@ var Forum;
                     return callback( err );
                 } else {
                     Exporter.connection = mongoose.connection;
-                    Exporter.warn( "Creating models..." );
+                    Exporter.log( "Creating models..." );
                     User = Exporter.connection.model('User', UserSchema, 'User');
                     Forum = Exporter.connection.model('Forum', ForumSchema, 'forum');
                     callback( null, Exporter.config() );
@@ -61,9 +61,9 @@ var Forum;
             Exporter.error(err.error);
             return callback(err);
         }
-        User.find( {}, function( err, users ) {
+        var query = User.find( {}, function( err, users ) {
+            Exporter.log( "Exporting " + users.length + " users." );
             async.each( users, function( user, callback ) {
-
                 // Get location if any
                 location = "";
                 if ( user.organization ) {
@@ -100,23 +100,29 @@ var Forum;
                 };
                 callback();
             }, function() {
-                Exporter.warn( map );
                 callback(null, map);
             } );
 
-        } ).skip( start ).limit( limit );
-    };
-
-    Exporter.getCategories = function(callback) {
-        return Exporter.getPaginatedCategories(0, null, callback);
+        } ).skip( start );
+        if( limit ) query.limit( limit );
     };
 
     var cid;
-
-    Exporter.getPaginatedCategories = function(start, limit, callback) {
+    Exporter.getCategories = function(callback) {
+    //     return Exporter.getPaginatedCategories(0, null, callback);
+    // };
+    //
+    //
+    // Exporter.getPaginatedCategories = function(start, limit, callback) {
         callback = !_.isFunction(callback) ? noop : callback;
 
         var err, map;
+
+		if (!Exporter.connection) {
+			err = {error: 'MySQL connection is not setup. Run setup(config) first'};
+			Exporter.error(err.error);
+			return callback(err);
+		}
 
         cid = new mongoose.Types.ObjectId;
 
@@ -126,7 +132,8 @@ var Forum;
             "_name": "General Discussion 2", // REQUIRED
             "_description": "A place to talk about whatever you want" // OPTIONAL
         };
-        Exporter.warn( map );
+
+        console.log( map );
         callback( null, map );
     };
 
@@ -143,7 +150,8 @@ var Forum;
             Exporter.error(err.error);
             return callback(err);
         }
-        Forum.find( {}, function( err, forums ) {
+        var query = Forum.find( {}, function( err, forums ) {
+            Exporter.log( "Exporting " + forums.length + " topics." );
             async.each( forums, function( forum, callback ) {
                 var comment = forum.comments.length > 0 ? forum.comments[0].comment : "";
                 map[ forum._id ] = {
@@ -156,10 +164,10 @@ var Forum;
                 };
                 callback();
             }, function () {
-                Exporter.warn( map );
                 callback(null, map);
             } );
-        } ).skip( start ).limit( limit );
+        } ).skip( start );
+        if( limit ) query.limit( limit );
     };
 
     Exporter.getPosts = function(callback) {
@@ -176,7 +184,7 @@ var Forum;
             return callback(err);
         }
 
-        Forum.find( {}, function( err, forums ) {
+        var query = Forum.find( {}, function( err, forums ) {
             async.each( forums, function( forum, callback ) {
                 for( var i = 1; i < forum.comments.length; i ++ ) {
                     comment = forum.comments[i];
@@ -191,17 +199,18 @@ var Forum;
                 }
                 callback();
             }, function () {
-                Exporter.warn( map );
                 callback(null, map);
             } );
-        } ).skip( start ).limit( limit );
+        } ).skip( start );
+        if( limit ) query.limit( limit );
     };
 
     Exporter.teardown = function(callback) {
         Exporter.log('Teardown!');
-        mongoose.disconnect();
-        Exporter.log('Done');
-        callback();
+        mongoose.disconnect().then( function () {
+            Exporter.log('Done');
+            callback();
+        } );
     };
 
     Exporter.testrun = function(config, callback) {
@@ -318,14 +327,14 @@ var Forum;
 
 
 //    TESTING
-    var testConfig = { testing: true };
-
-    Exporter.testrun( testConfig, function ( err ) {
-        if ( err )
-            Exporter.warn( err.error );
-        else
-            Exporter.warn( "Completed with no reported errors." );
-    } );
+//     var testConfig = { testing: true };
+//
+//     Exporter.testrun( testConfig, function ( err ) {
+//         if ( err )
+//             Exporter.warn( err.error );
+//         else
+//             Exporter.log( "Completed with no reported errors." );
+//     } );
 
 
 
