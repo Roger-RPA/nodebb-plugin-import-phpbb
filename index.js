@@ -92,8 +92,7 @@ var Forum;
                 map[ user._id ] = {
                     "_uid": user._id, // REQUIRED
                     "_email": user.username, // REQUIRED
-                    "_username": user.username, // REQUIRED
-                    "_alternativeUsername": user.first_name + " " + user.last_name, // OPTIONAL, defaults to '', some forums provide UserDisplayName, we could leverage that if the _username validation fails
+                    "_username": user.first_name + " " + user.last_name, // REQUIRED
                     "_fullname": user.first_name + " " + user.last_name, // OPTIONAL, defaults to ''
                     "_location": location, // OPTIONAL, defaults to ''
                     "_showemail": 0 // OPTIONAL, defaults to 0
