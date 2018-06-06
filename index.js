@@ -19,8 +19,8 @@ var Forum;
 
         var _config = {
             host: ( config.dbhost || config.host || 'localhost' ),
-            user: "",
-            pass: "",
+            user: config.dbuser || config.user || '',
+            pass: config.dbpass || config.pass || config.password || '',
             port: config.dbport || config.port || 27017,
             dbName: config.dbname || config.name || config.database || 'RPA',
             bufferCommands: false
