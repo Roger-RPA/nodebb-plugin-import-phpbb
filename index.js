@@ -41,7 +41,7 @@ var Forum;
         Exporter.config( _config );
 
         //Connect to MongoDB
-        Exporter.log('connecting...');
+        Exporter.log('connecting: ' + uri);
         mongoose.connect( uri, _config,
             function( err ) {
                 if( err ) {
