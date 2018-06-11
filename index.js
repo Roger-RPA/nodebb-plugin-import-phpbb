@@ -22,9 +22,16 @@ var Forum;
             user: config.dbuser || config.user || '',
             pass: config.dbpass || config.pass || config.password || '',
             port: config.dbport || config.port || 27017,
-            dbName: config.dbname || config.name || config.database || 'RPA',
+            dbName: config.dbname || config.name || config.database || '',
             bufferCommands: false
         };
+
+        if ( _config.user === "" && _config.pass === "" && _config.port === "27017" && _config.dbName === "" ) {
+            _config = {
+                host: _config.host,
+                bufferCommands: _config.bufferCommands
+            };
+        }
 
         Exporter.config( _config );
 
