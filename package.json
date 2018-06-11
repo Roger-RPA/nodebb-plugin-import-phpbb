@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-import-rpa",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Exporter for RPA's old forum",
   "main": "./index.js",
   "scripts": {
