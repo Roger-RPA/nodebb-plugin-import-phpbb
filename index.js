@@ -17,6 +17,8 @@ var Forum;
     Exporter.setup = function(config, callback) {
         Exporter.log('setup');
 
+        var uri;
+
         var _config = {
             host: ( config.dbhost || config.host || 'localhost' ),
             user: config.dbuser || config.user || '',
@@ -31,13 +33,16 @@ var Forum;
                 host: _config.host,
                 bufferCommands: _config.bufferCommands
             };
+            uri = "mongodb://" + _config.host;
+        } else {
+            uri = "mongodb://" + _config.host + ":" + _config.port;
         }
 
         Exporter.config( _config );
 
         //Connect to MongoDB
         Exporter.log('connecting...');
-        mongoose.connect( "mongodb://" + _config.host + ":" + _config.port, _config,
+        mongoose.connect( uri, _config,
             function( err ) {
                 if( err ) {
                     err.error = 'No database connection';
