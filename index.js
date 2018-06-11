@@ -26,7 +26,7 @@ var Forum;
             bufferCommands: false
         };
 
-        if ( _config.user === "" && _config.pass === "" && _config.port === "27017" && _config.dbName === "" ) {
+        if ( _config.user === "" && _config.pass === "" && _config.port === 27017 && _config.dbName === "" ) {
             _config = {
                 host: _config.host,
                 bufferCommands: _config.bufferCommands
